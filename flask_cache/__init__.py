@@ -415,7 +415,8 @@ class Cache(object):
                 )
                 # ... now hash the sorted (key, value) tuple so it can be
                 # used as a key for cache.
-                query_hash = str(hash(args_as_sorted_tuple))
+                if args_as_sorted_tuple:
+                    query_hash = str(hash(args_as_sorted_tuple))
 
             cache_key = hashlib.md5()
             cache_key.update(updated.encode('utf-8') + query_hash.encode('utf-8'))
