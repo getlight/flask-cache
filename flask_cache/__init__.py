@@ -20,6 +20,7 @@ import logging
 import string
 import uuid
 import warnings
+from operator import itemgetter
 
 from werkzeug import import_string
 from flask import request, current_app
@@ -371,7 +372,7 @@ class Cache(object):
 
         return fname, ''.join(version_data_list)
 
-    def _memoize_make_cache_key(self, make_name=None, timeout=None):
+    def _memoize_make_cache_key(self, make_name=None, timeout=None, use_query_string=True):
         """
         Function used to create the cache_key for memoized functions.
         """
@@ -399,8 +400,25 @@ class Cache(object):
             except AttributeError:
                 updated = "%s%s%s" % (altfname, keyargs, keykwargs)
 
+            query_hash = ''
+            if use_query_string:
+                # Create a tuple of (key, value) pairs, where the key is the
+                # argument name and the value is its respective value. Order this
+                # tuple by key. Doing this ensures the cache key created is always
+                # the same for query string args whose keys/values are the same,
+                # regardless of the order in which they are provided.
+                args_as_sorted_tuple = tuple(
+                    sorted(
+                        (pair for pair in request.args.items()),
+                        key=itemgetter(0),
+                    )
+                )
+                # ... now hash the sorted (key, value) tuple so it can be
+                # used as a key for cache.
+                query_hash = str(hash(args_as_sorted_tuple))
+
             cache_key = hashlib.md5()
-            cache_key.update(updated.encode('utf-8'))
+            cache_key.update(updated.encode('utf-8') + query_hash.encode('utf-8'))
             cache_key = base64.b64encode(cache_key.digest())[:16]
             cache_key = cache_key.decode('utf-8')
             cache_key += version_data
@@ -461,7 +479,7 @@ class Cache(object):
 
         return tuple(new_args), {}
 
-    def memoize(self, timeout=None, make_name=None, unless=None):
+    def memoize(self, timeout=None, make_name=None, unless=None, use_query_string=True):
         """
         Use this to cache the result of a function, taking its arguments into
         account in the cache key.
@@ -512,6 +530,14 @@ class Cache(object):
         :param unless: Default None. Cache will *always* execute the caching
                        facilities unelss this callable is true.
                        This will bypass the caching entirely.
+        :param use_query_string: Default True. When True, the cache key
+             used will be the include the result of hashing the
+             ordered query string parameters. This
+             avoids creating different caches for
+             the same query just because the parameters
+             were passed in a different order. See
+             _make_cache_key_query_string() for more
+             details. Taken from https://github.com/sh4nks/flask-caching/pull/35
 
         .. versionadded:: 0.5
             params ``make_name``, ``unless``
@@ -547,7 +573,7 @@ class Cache(object):
             decorated_function.uncached = f
             decorated_function.cache_timeout = timeout
             decorated_function.make_cache_key = self._memoize_make_cache_key(
-                                                make_name, decorated_function)
+                                                make_name, decorated_function, use_query_string)
             decorated_function.delete_memoized = lambda: self.delete_memoized(f)
 
             return decorated_function
