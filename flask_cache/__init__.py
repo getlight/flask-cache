@@ -372,7 +372,7 @@ class Cache(object):
 
         return fname, ''.join(version_data_list)
 
-    def _memoize_make_cache_key(self, make_name=None, timeout=None, use_query_string=True):
+    def _memoize_make_cache_key(self, make_name=None, timeout=None, use_query_string=False):
         """
         Function used to create the cache_key for memoized functions.
         """
@@ -480,7 +480,7 @@ class Cache(object):
 
         return tuple(new_args), {}
 
-    def memoize(self, timeout=None, make_name=None, unless=None, use_query_string=True):
+    def memoize(self, timeout=None, make_name=None, unless=None, use_query_string=False):
         """
         Use this to cache the result of a function, taking its arguments into
         account in the cache key.
@@ -531,7 +531,7 @@ class Cache(object):
         :param unless: Default None. Cache will *always* execute the caching
                        facilities unelss this callable is true.
                        This will bypass the caching entirely.
-        :param use_query_string: Default True. When True, the cache key
+        :param use_query_string: Default False. When True, the cache key
              used will be the include the result of hashing the
              ordered query string parameters. This
              avoids creating different caches for
