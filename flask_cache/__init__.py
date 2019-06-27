@@ -372,7 +372,8 @@ class Cache(object):
 
         return fname, ''.join(version_data_list)
 
-    def _memoize_make_cache_key(self, make_name=None, timeout=None, use_query_string=False):
+    def _memoize_make_cache_key(self, make_name=None, timeout=None,
+                                exclude_params=None, use_query_string=False):
         """
         Function used to create the cache_key for memoized functions.
         """
@@ -390,6 +391,7 @@ class Cache(object):
 
             if callable(f):
                 keyargs, keykwargs = self._memoize_kwargs_to_args(f,
+                                                                  exclude_params,
                                                                  *args,
                                                                  **kwargs)
             else:
@@ -427,7 +429,7 @@ class Cache(object):
             return cache_key
         return make_cache_key
 
-    def _memoize_kwargs_to_args(self, f, *args, **kwargs):
+    def _memoize_kwargs_to_args(self, f, exclude_params=None, *args, **kwargs):
         #: Inspect the arguments to the function
         #: This allows the memoization to be the same
         #: whether the function was called with
@@ -438,6 +440,10 @@ class Cache(object):
 
         args_len = len(argspec.args)
         for i in range(args_len):
+            #: not use params from exclude_params in cache key generation
+            if exclude_params and argspec.args[i] in exclude_params:
+                continue
+
             if i == 0 and argspec.args[i] in ('self', 'cls'):
                 #: use the repr of the class instance
                 #: this supports instance methods for
@@ -480,7 +486,7 @@ class Cache(object):
 
         return tuple(new_args), {}
 
-    def memoize(self, timeout=None, make_name=None, unless=None, use_query_string=False):
+    def memoize(self, timeout=None, make_name=None, unless=None, exclude_params=None, use_query_string=False):
         """
         Use this to cache the result of a function, taking its arguments into
         account in the cache key.
@@ -531,6 +537,9 @@ class Cache(object):
         :param unless: Default None. Cache will *always* execute the caching
                        facilities unelss this callable is true.
                        This will bypass the caching entirely.
+        :param exclude_params: Default None. If set to list of string, will exclude that
+                               parameters from cache key generation. For example, if you have f(p1, p2) and
+                               you don't want use parameter p2 for key generation, you may set exclude_params=["p2"]
         :param use_query_string: Default False. When True, the cache key
              used will be the include the result of hashing the
              ordered query string parameters. This
@@ -574,7 +583,8 @@ class Cache(object):
             decorated_function.uncached = f
             decorated_function.cache_timeout = timeout
             decorated_function.make_cache_key = self._memoize_make_cache_key(
-                                                make_name, decorated_function, use_query_string)
+                                                make_name, decorated_function,
+                                                exclude_params, use_query_string)
             decorated_function.delete_memoized = lambda: self.delete_memoized(f)
 
             return decorated_function
